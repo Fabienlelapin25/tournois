@@ -177,8 +177,8 @@
   <!-- LEFT PANEL (text only, admin login) -->
   <div class="side" id="leftPanel">
     <div class="pw-row">
-      <label class="muted">Mot de passe admin</label>
-      <input id="adminPw" type="password" placeholder="Entrer le mot de passe">
+      <label class="muted">Connexion admin (Google)</label>
+      <input id="adminPw" type="password" placeholder="Appuyez Entrée pour ouvrir Google Sign-In" aria-hidden="true" style="display:none;">
       <div style="display:flex;gap:8px;">
         <button id="btnLogin">Se connecter</button>
         <button id="btnLogout" class="ghost" style="display:none;">Se déconnecter</button>
@@ -234,40 +234,54 @@
 
 </div>
 
+<!-- Firebase compat SDKs (simple pour GitHub Pages) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
 <script>
-/* Leaderboard tout-en-un
-   - Persistance via localStorage key "clan_leaderboard_v1"
-   - Admin actions protégées par mot de passe (comparaison simple côté client)
-   - Max joueurs 100
-   - Ajout / soustraction via préfixe + / - dans champ d'édition
+/*
+  Version Firebase-ready du leaderboard
+  - Auth Google pour admins
+  - Realtime Database pour players (lecture publique, écriture admin)
+  - Remplace l'ancien script localStorage
 */
 
-// Configuration
-const STORAGE_KEY = 'clan_leaderboard_v1';
-const MAX_PLAYERS = 100;
-const ADMIN_PASSWORD = 'admin123'; // change si besoin
-let isAdmin = false;
+/* === Remplace par ta config Firebase (tu l'as déjà) === */
+const firebaseConfig = {
+  apiKey: "AIzaSyBW4Kb27bN5-Vjo5c58R6b_zp3I4d9oLGU",
+  authDomain: "tournois-d2.firebaseapp.com",
+  databaseURL: "https://tournois-d2-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "tournois-d2",
+  storageBucket: "tournois-d2.firebasestorage.app",
+  messagingSenderId: "585069698492",
+  appId: "1:585069698492:web:3a3082516f6ea607a11fb9",
+  measurementId: "G-6B18YR4F5W"
+};
+/* =================================================== */
 
-// Utilitaires
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.database();
+
+// Config local
+const MAX_PLAYERS = 100;
+let isAdmin = false;
+let currentUser = null;
+
+// Utilitaires DOM
 function qs(id){ return document.getElementById(id); }
-function save(data){ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
-function load(){ try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch(e){ return []; } }
 function formatScore(n){ return Number(n).toLocaleString('fr-FR'); }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
 function parseSigned(str){
   if(!str) return null;
   const m = str.replace(/\s+/g,'').match(/^([+-])(\d+)$/);
   if(!m) return null;
-  const sign = m[1] === '+' ? 1 : -1;
-  return sign * parseInt(m[2],10);
+  return (m[1] === '+' ? 1 : -1) * parseInt(m[2],10);
 }
 function genId(){ return 'p'+Math.random().toString(36).slice(2,9); }
 
-// State
-let players = load(); // array of {id,name,score,createdAt}
-
 // DOM refs
-const adminPw = qs('adminPw');
 const btnLogin = qs('btnLogin');
 const btnLogout = qs('btnLogout');
 const adminInfo = qs('adminInfo');
@@ -282,65 +296,93 @@ const emptyNotice = qs('emptyNotice');
 const btnReset = qs('btnReset');
 const thActions = qs('thActions');
 
-// Render function (corrigée)
-function render(){
-  // tri
-  players.sort((a,b)=> b.score - a.score || a.createdAt - b.createdAt);
+// Firebase refs
+const playersRef = db.ref('players');
 
-  // vider le tableau
+// Local state (populated by DB listener)
+let players = [];
+
+// Auth: Google Sign-In on btnLogin
+btnLogin.addEventListener('click', async () => {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  try {
+    const result = await auth.signInWithPopup(provider);
+    currentUser = result.user;
+    const uid = currentUser.uid;
+    const snap = await db.ref('admins/' + uid).get();
+    isAdmin = snap.exists() && snap.val() === true;
+    adminInfo.textContent = isAdmin ? "Connecté en tant qu'admin" : "Connecté (pas admin)";
+    btnLogin.style.display = 'none';
+    btnLogout.style.display = 'inline-block';
+    adminAddForm.style.display = isAdmin ? 'block' : 'none';
+    btnAddPlayer.style.display = isAdmin ? 'inline-block' : 'none';
+    btnReset.style.display = isAdmin ? 'inline-block' : 'none';
+    render();
+  } catch (err) {
+    alert('Connexion annulée ou erreur : ' + (err.message || err));
+  }
+});
+
+btnLogout.addEventListener('click', async () => {
+  await auth.signOut();
+  currentUser = null;
+  isAdmin = false;
+  adminInfo.textContent = 'Vue participant par défaut.';
+  btnLogin.style.display = 'inline-block';
+  btnLogout.style.display = 'none';
+  adminAddForm.style.display = 'none';
+  btnAddPlayer.style.display = 'none';
+  btnReset.style.display = 'none';
+  render();
+});
+
+// DB listener: met à jour players en temps réel
+playersRef.on('value', snapshot => {
+  const data = snapshot.val() || {};
+  players = Object.keys(data).map(k => ({ id: k, ...data[k] }));
+  render();
+});
+
+// Render function
+function render(){
+  players.sort((a,b)=> b.score - a.score || a.createdAt - b.createdAt);
   boardBody.innerHTML = '';
 
-  // masquer / afficher la colonne Actions selon admin
   thActions.style.display = isAdmin ? "" : "none";
-  // masquer toutes les cellules actions (4ème colonne)
-  document.querySelectorAll("#boardBody tr").forEach(tr => {
-    const td = tr.children[3];
-    if(td) td.style.display = isAdmin ? "" : "none";
-  });
-
-  // compteur joueurs
   countInfo.textContent = players.length + ' joueur' + (players.length>1?'s':'');
-
-  // message vide
   emptyNotice.style.display = players.length === 0 ? 'block' : 'none';
 
-  // génération des lignes
   players.forEach((p, idx) => {
     const tr = document.createElement('tr');
-
-    // top3
     if(idx === 0) tr.classList.add('top1');
     else if(idx === 1) tr.classList.add('top2');
     else if(idx === 2) tr.classList.add('top3');
 
-    // RANG
+    // rank
     const tdRank = document.createElement('td');
     tdRank.className = 'rank';
     tdRank.innerHTML = (idx<3?'<span class="trophy">🏆</span>':'') + (idx+1);
     tr.appendChild(tdRank);
 
-    // NOM + AVATAR
+    // name
     const tdName = document.createElement('td');
     tdName.className = 'player-name';
-
     const avatar = document.createElement('div');
     avatar.className = 'avatar';
-    avatar.textContent = p.name.slice(0,2).toUpperCase();
-
+    avatar.textContent = (p.name || '').slice(0,2).toUpperCase();
     const nameWrap = document.createElement('div');
-    nameWrap.innerHTML = '<div style="font-weight:700">'+escapeHtml(p.name)+'</div>';
-
+    nameWrap.innerHTML = '<div style="font-weight:700">'+escapeHtml(p.name || '')+'</div>';
     tdName.appendChild(avatar);
     tdName.appendChild(nameWrap);
     tr.appendChild(tdName);
 
-    // SCORE
+    // score
     const tdScore = document.createElement('td');
     tdScore.className = 'score';
-    tdScore.textContent = formatScore(p.score);
+    tdScore.textContent = formatScore(p.score || 0);
     tr.appendChild(tdScore);
 
-    // ACTIONS (admin uniquement)
+    // actions
     const tdActions = document.createElement('td');
     tdActions.style.textAlign = 'right';
 
@@ -352,36 +394,31 @@ function render(){
       const applyBtn = document.createElement('button');
       applyBtn.className = 'small';
       applyBtn.textContent = 'Appliquer';
-      applyBtn.onclick = ()=> {
+      applyBtn.onclick = async ()=> {
         const val = input.value.trim();
         if(!val){ alert('Entrez +N ou -N'); return; }
         const parsed = parseSigned(val);
         if(parsed === null){ alert('Format invalide. Exemple: +10 ou -5'); return; }
-        p.score = Math.max(0, p.score + parsed);
-        save(players);
-        render();
+        const newScore = Math.max(0, (p.score || 0) + parsed);
+        await db.ref('players/' + p.id + '/score').set(newScore);
       };
 
       const editBtn = document.createElement('button');
       editBtn.className = 'ghost small';
       editBtn.textContent = 'Modifier nom';
-      editBtn.onclick = ()=> {
+      editBtn.onclick = async ()=> {
         const newN = prompt('Nouveau nom pour '+p.name, p.name);
         if(newN && newN.trim()){
-          p.name = newN.trim();
-          save(players);
-          render();
+          await db.ref('players/' + p.id + '/name').set(newN.trim());
         }
       };
 
       const delBtn = document.createElement('button');
       delBtn.className = 'ghost small';
       delBtn.textContent = 'Supprimer';
-      delBtn.onclick = ()=> {
+      delBtn.onclick = async ()=> {
         if(confirm('Supprimer '+p.name+' du classement ?')){
-          players = players.filter(x=> x.id !== p.id);
-          save(players);
-          render();
+          await db.ref('players/' + p.id).remove();
         }
       };
 
@@ -389,16 +426,13 @@ function render(){
       tdActions.appendChild(applyBtn);
       tdActions.appendChild(editBtn);
       tdActions.appendChild(delBtn);
-    } else {
-      // si pas admin, on laisse la cellule vide (elle sera masquée via thActions)
-      tdActions.innerHTML = '';
     }
 
     tr.appendChild(tdActions);
     boardBody.appendChild(tr);
   });
 
-  // Après avoir ajouté les lignes, masquer les cellules actions si nécessaire
+  // masquer cellules actions si pas admin (sécurité UI)
   if(!isAdmin){
     document.querySelectorAll("#boardBody tr").forEach(tr => {
       const td = tr.children[3];
@@ -407,78 +441,65 @@ function render(){
   }
 }
 
-// Admin flow
-btnLogin.addEventListener('click', ()=>{
-  const val = adminPw.value || '';
-  if(val === ADMIN_PASSWORD){
-    isAdmin = true;
-    adminInfo.textContent = 'Connecté en tant qu\'admin';
-    btnLogin.style.display = 'none';
-    btnLogout.style.display = 'inline-block';
-    adminAddForm.style.display = 'block';
-    btnAddPlayer.style.display = 'inline-block';
-    btnReset.style.display = 'inline-block';
-    adminPw.value = '';
-    render();
-  } else {
-    alert('Mot de passe incorrect');
-  }
-});
-
-btnLogout.addEventListener('click', ()=>{
-  isAdmin = false;
-  adminInfo.textContent = 'Vue participant par défaut.';
-  btnLogin.style.display = 'inline-block';
-  btnLogout.style.display = 'none';
-  adminAddForm.style.display = 'none';
-  btnAddPlayer.style.display = 'none';
-  btnReset.style.display = 'none';
-  render();
-});
-
-// add player
+// Admin add player
 btnAddPlayer.addEventListener('click', ()=> {
   adminAddForm.style.display = adminAddForm.style.display === 'none' ? 'block' : 'none';
 });
 
-confirmAdd.addEventListener('click', ()=> {
+confirmAdd.addEventListener('click', async ()=> {
+  if(!isAdmin){ alert('Accès admin requis'); return; }
   const name = (newName.value || '').trim();
   const score = Number(newScore.value || 0);
   if(!name){ alert('Nom requis'); return; }
   if(players.length >= MAX_PLAYERS){ alert('Nombre maximum de joueurs atteint ('+MAX_PLAYERS+')'); return; }
-  const p = { id: genId(), name: name, score: Math.max(0, Math.floor(score)), createdAt: Date.now() };
-  players.push(p);
-  save(players);
+  const id = genId();
+  const p = { name: name, score: Math.max(0, Math.floor(score)), createdAt: Date.now() };
+  await db.ref('players/' + id).set(p);
   newName.value = ''; newScore.value = '0';
-  render();
 });
 
 // reset (admin)
-btnReset.addEventListener('click', ()=> {
+btnReset.addEventListener('click', async ()=> {
   if(!isAdmin){ alert('Accès admin requis'); return; }
   if(confirm('Réinitialiser tout le leaderboard ? (action irréversible)')){
-    players = [];
-    save(players);
-    render();
+    await db.ref('players').remove();
   }
 });
 
-// initial state: hide admin-only controls
+// initial UI state
 adminAddForm.style.display = 'none';
 btnAddPlayer.style.display = 'none';
 btnReset.style.display = 'none';
 
-// initial render
-render();
+// Auth state listener
+auth.onAuthStateChanged(async user => {
+  currentUser = user;
+  if(user){
+    const uid = user.uid;
+    const snap = await db.ref('admins/' + uid).get();
+    isAdmin = snap.exists() && snap.val() === true;
+    adminInfo.textContent = isAdmin ? "Connecté en tant qu'admin" : "Connecté (pas admin)";
+    btnLogin.style.display = 'none';
+    btnLogout.style.display = 'inline-block';
+    adminAddForm.style.display = isAdmin ? 'block' : 'none';
+    btnAddPlayer.style.display = isAdmin ? 'inline-block' : 'none';
+    btnReset.style.display = isAdmin ? 'inline-block' : 'none';
+    render();
+  } else {
+    isAdmin = false;
+    adminInfo.textContent = 'Vue participant par défaut.';
+    btnLogin.style.display = 'inline-block';
+    btnLogout.style.display = 'none';
+    adminAddForm.style.display = 'none';
+    btnAddPlayer.style.display = 'none';
+    btnReset.style.display = 'none';
+    render();
+  }
+});
 
-// accessibility: Enter to login
-adminPw.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') btnLogin.click(); });
+// accessibility: Enter to trigger login (kept for UX)
+document.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') btnLogin.click(); });
 
-/* Notes:
- - Pour changer le mot de passe admin : modifier ADMIN_PASSWORD dans ce fichier.
- - Les données sont stockées localement dans le navigateur (localStorage). Pour partager entre plusieurs personnes, il faut une API/BDD.
- - Limite 100 joueurs appliquée côté client.
-*/
 </script>
 
 </body>
