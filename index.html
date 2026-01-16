@@ -4,7 +4,6 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Leaderboard - Tournoi Clan</title>
-
 <style>
   :root{
     --bg:#0b0f14;
@@ -18,163 +17,41 @@
     --success:#7ef0a4;
     --max-players:100;
   }
-
-  html,body{
-    height:100%;
-    margin:0;
-    background:
-      radial-gradient(1200px 600px at 10% 10%, rgba(61,209,255,0.03), transparent 6%),
-      linear-gradient(180deg,#071018 0%, #071018 40%, #05060a 100%);
-    color:#e6f3fb;
-    font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;
-  }
-
-  .wrap{
-    display:grid;
-    grid-template-columns:220px 1fr 220px;
-    gap:20px;
-    padding:22px;
-    align-items:start;
-    min-height:100vh;
-    box-sizing:border-box;
-  }
-
-  .side{
-    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-    border:1px solid rgba(255,255,255,0.03);
-    padding:14px;
-    border-radius:12px;
-    box-shadow:var(--glow);
-    height:fit-content;
-    min-height:120px;
-  }
-
-  .center{
-    background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));
-    border:1px solid rgba(255,255,255,0.04);
-    padding:18px;
-    border-radius:14px;
-    box-shadow:var(--card-glow);
-  }
-
-  /* password */
-  .pw-row{
-    display:flex;
-    flex-direction:column;
-    gap:8px;
-  }
-
-  input[type="password"], input[type="text"], input[type="number"]{
-    background:transparent;
-    border:1px solid rgba(255,255,255,0.06);
-    padding:10px;
-    border-radius:8px;
-    color:inherit;
-    outline:none;
-  }
-
-  button{
-    background:linear-gradient(90deg,var(--accent),var(--accent-2));
-    border:0;
-    padding:10px 12px;
-    border-radius:10px;
-    color:#02121a;
-    font-weight:700;
-    cursor:pointer;
-    box-shadow:0 6px 18px rgba(61,209,255,0.12);
-  }
-
-  button.ghost{
-    background:transparent;
-    border:1px solid rgba(255,255,255,0.04);
-    color:var(--muted);
-  }
-
+  html,body{height:100%;margin:0;background:radial-gradient(1200px 600px at 10% 10%, rgba(61,209,255,0.03), transparent 6%),linear-gradient(180deg,#071018 0%, #071018 40%, #05060a 100%);color:#e6f3fb;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;}
+  .wrap{display:grid;grid-template-columns:220px 1fr 220px;gap:20px;padding:22px;align-items:start;min-height:100vh;box-sizing:border-box;}
+  .side{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.03);padding:14px;border-radius:12px;box-shadow:var(--glow);height:fit-content;min-height:120px;}
+  .center{background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));border:1px solid rgba(255,255,255,0.04);padding:18px;border-radius:14px;box-shadow:var(--card-glow);}
+  .pw-row{display:flex;flex-direction:column;gap:8px;}
+  input[type="password"], input[type="text"], input[type="number"]{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:10px;border-radius:8px;color:inherit;outline:none;}
+  button{background:linear-gradient(90deg,var(--accent),var(--accent-2));border:0;padding:10px 12px;border-radius:10px;color:#02121a;font-weight:700;cursor:pointer;box-shadow:0 6px 18px rgba(61,209,255,0.12);}
+  button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted);}
   .muted{color:var(--muted);font-size:13px;}
-
-  /* leaderboard table */
   .board-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
   .board-title{display:flex;gap:12px;align-items:center;}
   .board-title h2{margin:0;font-size:18px;color:var(--accent-2);}
   .board-controls{display:flex;gap:8px;align-items:center;}
-
   table{width:100%;border-collapse:collapse;font-size:14px;}
-  thead th{
-    font-weight:600;
-    text-align:left;
-    padding:10px 8px;
-    color:var(--muted);
-    font-size:12px;
-    border-bottom:1px solid rgba(255,255,255,0.03);
-  }
-
-  tbody tr{
-    transition:transform .12s ease, background .12s ease;
-  }
-
-  tbody tr:hover{
-    transform:translateY(-3px);
-    background:linear-gradient(90deg, rgba(61,209,255,0.02), transparent);
-  }
-
-  td{
-    padding:12px 8px;
-    border-bottom:1px solid rgba(255,255,255,0.02);
-    vertical-align:middle;
-  }
-
+  thead th{font-weight:600;text-align:left;padding:10px 8px;color:var(--muted);font-size:12px;border-bottom:1px solid rgba(255,255,255,0.03);}
+  tbody tr{transition:transform .12s ease, background .12s ease;}
+  tbody tr:hover{transform:translateY(-3px);background:linear-gradient(90deg, rgba(61,209,255,0.02), transparent);}
+  td{padding:12px 8px;border-bottom:1px solid rgba(255,255,255,0.02);vertical-align:middle;}
   .rank{width:56px;font-weight:700;color:var(--accent);}
   .player-name{display:flex;gap:10px;align-items:center;}
-
-  .avatar{
-    width:36px;
-    height:36px;
-    border-radius:8px;
-    background:linear-gradient(135deg,#0b1b26,#07202a);
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-weight:700;
-    color:var(--accent-2);
-    box-shadow:0 6px 18px rgba(61,209,255,0.06);
-  }
-
-  .score{
-    font-weight:800;
-    color:#fff;
-    text-align:right;
-    width:110px;
-  }
-
+  .avatar{width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#0b1b26,#07202a);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--accent-2);box-shadow:0 6px 18px rgba(61,209,255,0.06);}
+  .score{font-weight:800;color:#fff;text-align:right;width:110px;}
   .small{font-size:12px;padding:8px 10px;border-radius:8px;}
   .input-inline{width:120px;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;}
-
-  /* top3 */
   .top1{background:linear-gradient(90deg, rgba(255,215,0,0.06), transparent);border-left:4px solid #ffd54a;}
   .top2{background:linear-gradient(90deg, rgba(192,192,192,0.03), transparent);border-left:4px solid #c0c0c0;}
   .top3{background:linear-gradient(90deg, rgba(205,127,50,0.03), transparent);border-left:4px solid #cd7f32;}
-
   .trophy{font-size:18px;margin-right:6px;color:var(--accent-2);}
   .empty{opacity:0.45;text-align:center;padding:28px;border:1px dashed rgba(255,255,255,0.03);border-radius:10px;color:var(--muted);}
-
-  /* right logo */
   #rightPanel img{width:180px;height:180px;object-fit:contain;filter:drop-shadow(0 0 40px rgba(61,209,255,0.45));}
-
-  /* responsive */
-  @media (max-width:900px){
-    .wrap{grid-template-columns:1fr; padding:12px;}
-    #rightPanel{order:3}
-    #leftPanel{order:1}
-    .center{order:2}
-    #rightPanel img{width:120px;height:120px;}
-  }
+  @media (max-width:900px){.wrap{grid-template-columns:1fr; padding:12px;}#rightPanel{order:3}#leftPanel{order:1}.center{order:2}#rightPanel img{width:120px;height:120px;}}
 </style>
 </head>
-
 <body>
 <div class="wrap">
-
-  <!-- LEFT PANEL (text only, admin login) -->
   <div class="side" id="leftPanel">
     <div class="pw-row">
       <label class="muted">Mot de passe admin</label>
@@ -187,7 +64,6 @@
     </div>
   </div>
 
-  <!-- CENTER PANEL -->
   <div class="center">
     <div class="board-header">
       <div class="board-title">
@@ -227,253 +103,16 @@
     </div>
   </div>
 
-  <!-- RIGHT PANEL (logo only) -->
   <div class="side" id="rightPanel" style="display:flex;flex-direction:column;align-items:center;justify-content:center;">
     <img src="https://i.imgur.com/w5zbkQJ.png" alt="logo clan">
   </div>
-
 </div>
 
-<!-- Firebase compat SDKs (simple pour GitHub Pages) -->
+<!-- Firebase compat SDKs -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
 <script>
-/*
-  Leaderboard partagé via Firebase Realtime Database
-  - Auth admin via mot de passe (client-side, visible dans le code)
-  - Firebase utilisé uniquement comme base de données partagée
-  - IMPORTANT : Assurez-vous que vos règles Realtime Database autorisent l'écriture si vous gardez l'authentification côté client (ex: public write)
-*/
-
-/* === CONFIG FIREBASE : remplace si besoin par ta config exacte === */
+/* CONFIG FIREBASE */
 const firebaseConfig = {
-  apiKey: "AIzaSyBW4Kb27bN5-Vjo5c58R6b_zp3I4d9oLGU",
-  authDomain: "tournois-d2.firebaseapp.com",
-  databaseURL: "https://tournois-d2-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "tournois-d2",
-  storageBucket: "tournois-d2.firebasestorage.app",
-  messagingSenderId: "585069698492",
-  appId: "1:585069698492:web:3a3082516f6ea607a11fb9",
-  measurementId: "G-6B18YR4F5W"
-};
-/* ================================================================== */
-
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-
-// === ADMIN PASSWORD (visible dans le code) ===
-const ADMIN_PASSWORD = 'admin123'; // change ici si tu veux un autre mot de passe
-// =============================================
-
-const MAX_PLAYERS = 100;
-let isAdmin = false;
-
-// Utilitaires DOM
-function qs(id){ return document.getElementById(id); }
-function formatScore(n){ return Number(n).toLocaleString('fr-FR'); }
-function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
-function parseSigned(str){
-  if(!str) return null;
-  const m = str.replace(/\s+/g,'').match(/^([+-])(\d+)$/);
-  if(!m) return null;
-  return (m[1] === '+' ? 1 : -1) * parseInt(m[2],10);
-}
-function genId(){ return 'p'+Math.random().toString(36).slice(2,9); }
-
-// DOM refs
-const adminPw = qs('adminPw');
-const btnLogin = qs('btnLogin');
-const btnLogout = qs('btnLogout');
-const adminInfo = qs('adminInfo');
-const btnAddPlayer = qs('btnAddPlayer');
-const adminAddForm = qs('adminAddForm');
-const confirmAdd = qs('confirmAdd');
-const newName = qs('newName');
-const newScore = qs('newScore');
-const boardBody = qs('boardBody');
-const countInfo = qs('countInfo');
-const emptyNotice = qs('emptyNotice');
-const btnReset = qs('btnReset');
-const thActions = qs('thActions');
-
-// Firebase DB ref
-const playersRef = db.ref('players');
-
-// Local state
-let players = [];
-
-// DB listener: update UI in real time
-playersRef.on('value', snapshot => {
-  const data = snapshot.val() || {};
-  players = Object.keys(data).map(k => ({ id: k, ...data[k] }));
-  render();
-});
-
-// Render function
-function render(){
-  players.sort((a,b)=> b.score - a.score || a.createdAt - b.createdAt);
-  boardBody.innerHTML = '';
-
-  thActions.style.display = isAdmin ? "" : "none";
-  countInfo.textContent = players.length + ' joueur' + (players.length>1?'s':'');
-  emptyNotice.style.display = players.length === 0 ? 'block' : 'none';
-
-  players.forEach((p, idx) => {
-    const tr = document.createElement('tr');
-    if(idx === 0) tr.classList.add('top1');
-    else if(idx === 1) tr.classList.add('top2');
-    else if(idx === 2) tr.classList.add('top3');
-
-    // rank
-    const tdRank = document.createElement('td');
-    tdRank.className = 'rank';
-    tdRank.innerHTML = (idx<3?'<span class="trophy">🏆</span>':'') + (idx+1);
-    tr.appendChild(tdRank);
-
-    // name
-    const tdName = document.createElement('td');
-    tdName.className = 'player-name';
-    const avatar = document.createElement('div');
-    avatar.className = 'avatar';
-    avatar.textContent = (p.name || '').slice(0,2).toUpperCase();
-    const nameWrap = document.createElement('div');
-    nameWrap.innerHTML = '<div style="font-weight:700">'+escapeHtml(p.name || '')+'</div>';
-    tdName.appendChild(avatar);
-    tdName.appendChild(nameWrap);
-    tr.appendChild(tdName);
-
-    // score
-    const tdScore = document.createElement('td');
-    tdScore.className = 'score';
-    tdScore.textContent = formatScore(p.score || 0);
-    tr.appendChild(tdScore);
-
-    // actions
-    const tdActions = document.createElement('td');
-    tdActions.style.textAlign = 'right';
-
-    if(isAdmin){
-      const input = document.createElement('input');
-      input.className = 'input-inline';
-      input.placeholder = '+10 ou -5';
-
-      const applyBtn = document.createElement('button');
-      applyBtn.className = 'small';
-      applyBtn.textContent = 'Appliquer';
-      applyBtn.onclick = async ()=> {
-        const val = input.value.trim();
-        if(!val){ alert('Entrez +N ou -N'); return; }
-        const parsed = parseSigned(val);
-        if(parsed === null){ alert('Format invalide. Exemple: +10 ou -5'); return; }
-        const newScore = Math.max(0, (p.score || 0) + parsed);
-        await db.ref('players/' + p.id + '/score').set(newScore);
-      };
-
-      const editBtn = document.createElement('button');
-      editBtn.className = 'ghost small';
-      editBtn.textContent = 'Modifier nom';
-      editBtn.onclick = async ()=> {
-        const newN = prompt('Nouveau nom pour '+p.name, p.name);
-        if(newN && newN.trim()){
-          await db.ref('players/' + p.id + '/name').set(newN.trim());
-        }
-      };
-
-      const delBtn = document.createElement('button');
-      delBtn.className = 'ghost small';
-      delBtn.textContent = 'Supprimer';
-      delBtn.onclick = async ()=> {
-        if(confirm('Supprimer '+p.name+' du classement ?')){
-          await db.ref('players/' + p.id).remove();
-        }
-      };
-
-      tdActions.appendChild(input);
-      tdActions.appendChild(applyBtn);
-      tdActions.appendChild(editBtn);
-      tdActions.appendChild(delBtn);
-    }
-
-    tr.appendChild(tdActions);
-    boardBody.appendChild(tr);
-  });
-
-  // masquer cellules actions si pas admin (sécurité UI)
-  if(!isAdmin){
-    document.querySelectorAll("#boardBody tr").forEach(tr => {
-      const td = tr.children[3];
-      if(td) td.style.display = 'none';
-    });
-  }
-}
-
-// Admin login using client-side password
-btnLogin.addEventListener('click', ()=> {
-  const val = (adminPw.value || '').trim();
-  if(val === ADMIN_PASSWORD){
-    isAdmin = true;
-    adminInfo.textContent = "Connecté en tant qu'admin";
-    btnLogin.style.display = 'none';
-    btnLogout.style.display = 'inline-block';
-    adminAddForm.style.display = 'block';
-    btnAddPlayer.style.display = 'inline-block';
-    btnReset.style.display = 'inline-block';
-    adminPw.value = '';
-    render();
-  } else {
-    alert('Mot de passe incorrect');
-  }
-});
-
-btnLogout.addEventListener('click', ()=> {
-  isAdmin = false;
-  adminInfo.textContent = 'Vue participant par défaut.';
-  btnLogin.style.display = 'inline-block';
-  btnLogout.style.display = 'none';
-  adminAddForm.style.display = 'none';
-  btnAddPlayer.style.display = 'none';
-  btnReset.style.display = 'none';
-  render();
-});
-
-// add player
-btnAddPlayer.addEventListener('click', ()=> {
-  adminAddForm.style.display = adminAddForm.style.display === 'none' ? 'block' : 'none';
-});
-
-confirmAdd.addEventListener('click', async ()=> {
-  if(!isAdmin){ alert('Accès admin requis'); return; }
-  const name = (newName.value || '').trim();
-  const score = Number(newScore.value || 0);
-  if(!name){ alert('Nom requis'); return; }
-  if(players.length >= MAX_PLAYERS){ alert('Nombre maximum de joueurs atteint ('+MAX_PLAYERS+')'); return; }
-  const id = genId();
-  const p = { name: name, score: Math.max(0, Math.floor(score)), createdAt: Date.now() };
-  await db.ref('players/' + id).set(p);
-  newName.value = ''; newScore.value = '0';
-});
-
-// reset (admin)
-btnReset.addEventListener('click', async ()=> {
-  if(!isAdmin){ alert('Accès admin requis'); return; }
-  if(confirm('Réinitialiser tout le leaderboard ? (action irréversible)')){
-    await db.ref('players').remove();
-  }
-});
-
-// initial UI state
-adminAddForm.style.display = 'none';
-btnAddPlayer.style.display = 'none';
-btnReset.style.display = 'none';
-
-// accessibility: Enter to login
-adminPw.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') btnLogin.click(); });
-
-// initial render (will be populated by DB listener)
-render();
-
-</script>
-
-</body>
-</html>
+  apiKey: "AIzaSyBW4Kb27bN5-Vjo5c58R6b
