@@ -177,8 +177,8 @@
   <!-- LEFT PANEL (text only, admin login) -->
   <div class="side" id="leftPanel">
     <div class="pw-row">
-      <label class="muted">Connexion admin (Google)</label>
-      <input id="adminPw" type="password" placeholder="Appuyez Entrée pour ouvrir Google Sign-In" aria-hidden="true" style="display:none;">
+      <label class="muted">Mot de passe admin</label>
+      <input id="adminPw" type="password" placeholder="Entrer le mot de passe admin">
       <div style="display:flex;gap:8px;">
         <button id="btnLogin">Se connecter</button>
         <button id="btnLogout" class="ghost" style="display:none;">Se déconnecter</button>
@@ -236,18 +236,17 @@
 
 <!-- Firebase compat SDKs (simple pour GitHub Pages) -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
 <script>
 /*
-  Version Firebase-ready du leaderboard
-  - Auth Google pour admins
-  - Realtime Database pour players (lecture publique, écriture admin)
-  - Remplace l'ancien script localStorage
+  Leaderboard partagé via Firebase Realtime Database
+  - Auth admin via mot de passe (client-side, visible dans le code)
+  - Firebase utilisé uniquement comme base de données partagée
+  - IMPORTANT : Assurez-vous que vos règles Realtime Database autorisent l'écriture si vous gardez l'authentification côté client (ex: public write)
 */
 
-/* === Remplace par ta config Firebase (tu l'as déjà) === */
+/* === CONFIG FIREBASE : remplace si besoin par ta config exacte === */
 const firebaseConfig = {
   apiKey: "AIzaSyBW4Kb27bN5-Vjo5c58R6b_zp3I4d9oLGU",
   authDomain: "tournois-d2.firebaseapp.com",
@@ -258,16 +257,17 @@ const firebaseConfig = {
   appId: "1:585069698492:web:3a3082516f6ea607a11fb9",
   measurementId: "G-6B18YR4F5W"
 };
-/* =================================================== */
+/* ================================================================== */
 
 firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
 const db = firebase.database();
 
-// Config local
+// === ADMIN PASSWORD (visible dans le code) ===
+const ADMIN_PASSWORD = 'admin123'; // change ici si tu veux un autre mot de passe
+// =============================================
+
 const MAX_PLAYERS = 100;
 let isAdmin = false;
-let currentUser = null;
 
 // Utilitaires DOM
 function qs(id){ return document.getElementById(id); }
@@ -282,6 +282,7 @@ function parseSigned(str){
 function genId(){ return 'p'+Math.random().toString(36).slice(2,9); }
 
 // DOM refs
+const adminPw = qs('adminPw');
 const btnLogin = qs('btnLogin');
 const btnLogout = qs('btnLogout');
 const adminInfo = qs('adminInfo');
@@ -296,47 +297,13 @@ const emptyNotice = qs('emptyNotice');
 const btnReset = qs('btnReset');
 const thActions = qs('thActions');
 
-// Firebase refs
+// Firebase DB ref
 const playersRef = db.ref('players');
 
-// Local state (populated by DB listener)
+// Local state
 let players = [];
 
-// Auth: Google Sign-In on btnLogin
-btnLogin.addEventListener('click', async () => {
-  const provider = new firebase.auth.GoogleAuthProvider();
-  try {
-    const result = await auth.signInWithPopup(provider);
-    currentUser = result.user;
-    const uid = currentUser.uid;
-    const snap = await db.ref('admins/' + uid).get();
-    isAdmin = snap.exists() && snap.val() === true;
-    adminInfo.textContent = isAdmin ? "Connecté en tant qu'admin" : "Connecté (pas admin)";
-    btnLogin.style.display = 'none';
-    btnLogout.style.display = 'inline-block';
-    adminAddForm.style.display = isAdmin ? 'block' : 'none';
-    btnAddPlayer.style.display = isAdmin ? 'inline-block' : 'none';
-    btnReset.style.display = isAdmin ? 'inline-block' : 'none';
-    render();
-  } catch (err) {
-    alert('Connexion annulée ou erreur : ' + (err.message || err));
-  }
-});
-
-btnLogout.addEventListener('click', async () => {
-  await auth.signOut();
-  currentUser = null;
-  isAdmin = false;
-  adminInfo.textContent = 'Vue participant par défaut.';
-  btnLogin.style.display = 'inline-block';
-  btnLogout.style.display = 'none';
-  adminAddForm.style.display = 'none';
-  btnAddPlayer.style.display = 'none';
-  btnReset.style.display = 'none';
-  render();
-});
-
-// DB listener: met à jour players en temps réel
+// DB listener: update UI in real time
 playersRef.on('value', snapshot => {
   const data = snapshot.val() || {};
   players = Object.keys(data).map(k => ({ id: k, ...data[k] }));
@@ -441,7 +408,36 @@ function render(){
   }
 }
 
-// Admin add player
+// Admin login using client-side password
+btnLogin.addEventListener('click', ()=> {
+  const val = (adminPw.value || '').trim();
+  if(val === ADMIN_PASSWORD){
+    isAdmin = true;
+    adminInfo.textContent = "Connecté en tant qu'admin";
+    btnLogin.style.display = 'none';
+    btnLogout.style.display = 'inline-block';
+    adminAddForm.style.display = 'block';
+    btnAddPlayer.style.display = 'inline-block';
+    btnReset.style.display = 'inline-block';
+    adminPw.value = '';
+    render();
+  } else {
+    alert('Mot de passe incorrect');
+  }
+});
+
+btnLogout.addEventListener('click', ()=> {
+  isAdmin = false;
+  adminInfo.textContent = 'Vue participant par défaut.';
+  btnLogin.style.display = 'inline-block';
+  btnLogout.style.display = 'none';
+  adminAddForm.style.display = 'none';
+  btnAddPlayer.style.display = 'none';
+  btnReset.style.display = 'none';
+  render();
+});
+
+// add player
 btnAddPlayer.addEventListener('click', ()=> {
   adminAddForm.style.display = adminAddForm.style.display === 'none' ? 'block' : 'none';
 });
@@ -471,34 +467,11 @@ adminAddForm.style.display = 'none';
 btnAddPlayer.style.display = 'none';
 btnReset.style.display = 'none';
 
-// Auth state listener
-auth.onAuthStateChanged(async user => {
-  currentUser = user;
-  if(user){
-    const uid = user.uid;
-    const snap = await db.ref('admins/' + uid).get();
-    isAdmin = snap.exists() && snap.val() === true;
-    adminInfo.textContent = isAdmin ? "Connecté en tant qu'admin" : "Connecté (pas admin)";
-    btnLogin.style.display = 'none';
-    btnLogout.style.display = 'inline-block';
-    adminAddForm.style.display = isAdmin ? 'block' : 'none';
-    btnAddPlayer.style.display = isAdmin ? 'inline-block' : 'none';
-    btnReset.style.display = isAdmin ? 'inline-block' : 'none';
-    render();
-  } else {
-    isAdmin = false;
-    adminInfo.textContent = 'Vue participant par défaut.';
-    btnLogin.style.display = 'inline-block';
-    btnLogout.style.display = 'none';
-    adminAddForm.style.display = 'none';
-    btnAddPlayer.style.display = 'none';
-    btnReset.style.display = 'none';
-    render();
-  }
-});
+// accessibility: Enter to login
+adminPw.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') btnLogin.click(); });
 
-// accessibility: Enter to trigger login (kept for UX)
-document.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') btnLogin.click(); });
+// initial render (will be populated by DB listener)
+render();
 
 </script>
 
