@@ -36,6 +36,9 @@
   .controls{display:flex;gap:8px;align-items:center;}
   .empty{opacity:0.45;text-align:center;padding:28px;border:1px dashed rgba(255,255,255,0.03);border-radius:10px;color:var(--muted);margin-top:12px;}
   @media (max-width:980px){.wrap{grid-template-columns:1fr;padding:12px;} .right{order:3}}
+  /* Quick fixes if GitHub Pages or cache changed layout */
+  body{box-sizing:border-box;}
+  .wrap{padding:18px;}
 </style>
 </head>
 <body>
@@ -97,25 +100,51 @@
   </div>
 </div>
 
-<!-- Firebase compat SDKs -->
+<!-- Firebase compat SDKs (must be before the init block below) -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
+<!-- Safe Firebase config + init: place before any code that uses `db` -->
 <script>
-/* ---------- CONFIG FIREBASE (ne rien changer si tu veux utiliser ton projet) ---------- */
-const firebaseConfig = {
-  apiKey: "AIzaSyBW4Kb27bN5-Vjo5c58R6b_zp3I4d9oLGU",
-  authDomain: "tournois-d2.firebaseapp.com",
-  databaseURL: "https://tournois-d2-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "tournois-d2",
-  storageBucket: "tournois-d2.firebasestorage.app",
-  messagingSenderId: "585069698492",
-  appId: "1:585069698492:web:3a3082516f6ea607a11fb9",
-  measurementId: "G-6B18YR4F5W"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+  // --- CONFIG FIREBASE (remplace si tu veux utiliser ton propre projet) ---
+  const firebaseConfig = {
+    apiKey: "AIzaSyBW4Kb27bN5-Vjo5c58R6b_zp3I4d9oLGU",
+    authDomain: "tournois-d2.firebaseapp.com",
+    databaseURL: "https://tournois-d2-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "tournois-d2",
+    storageBucket: "tournois-d2.firebasestorage.app",
+    messagingSenderId: "585069698492",
+    appId: "1:585069698492:web:3a3082516f6ea607a11fb9",
+    measurementId: "G-6B18YR4F5W"
+  };
 
+  // Init Firebase safely and expose window.db when ready
+  (function initFirebaseSafe(){
+    let tries = 0;
+    function tryInit(){
+      tries++;
+      if (typeof firebase !== 'undefined' && typeof firebase.initializeApp === 'function') {
+        try {
+          if (!firebase.apps || firebase.apps.length === 0) {
+            firebase.initializeApp(firebaseConfig);
+          }
+          window.db = firebase.database();
+          console.log('Firebase initialisé — db prête.');
+          window.dispatchEvent(new Event('firebase-db-ready'));
+        } catch(e) {
+          console.error('Erreur init Firebase', e);
+        }
+      } else {
+        if (tries < 12) setTimeout(tryInit, 300);
+        else console.error('Firebase non chargé après plusieurs tentatives.');
+      }
+    }
+    tryInit();
+  })();
+</script>
+
+<!-- Main script: waits for db ready before using it -->
+<script>
 /* ---------- ADMIN PASSWORD (visible dans le code) ---------- */
 const ADMIN_PASSWORD = 'admin123';
 window.ADMIN_PASSWORD = ADMIN_PASSWORD; // expose pour debug si besoin
@@ -143,18 +172,30 @@ const emptyNotice = qs('emptyNotice');
 const btnReset = qs('btnReset');
 const thActions = qs('thActions');
 
-/* ---------- DB ref & state ---------- */
-const playersRef = db.ref('players');
+/* ---------- State ---------- */
 let players = [];
 let isAdmin = false;
 
-/* ---------- DB listener ---------- */
-playersRef.on('value', snapshot => {
-  const data = snapshot.val() || {};
-  players = Object.keys(data).map(k => ({ id: k, ...data[k] }));
-  render();
-}, err => {
-  console.error('Erreur DB listener', err);
+/* ---------- Helper: wait for db ---------- */
+function whenDbReady(fn){
+  if (window.db) return fn();
+  window.addEventListener('firebase-db-ready', fn, { once: true });
+}
+
+/* ---------- DB listener (attached when db ready) ---------- */
+whenDbReady(() => {
+  const playersRef = window.db.ref('players');
+  playersRef.on('value', snapshot => {
+    const data = snapshot.val() || {};
+    players = Object.keys(data).map(k => ({ id: k, ...data[k] }));
+    render();
+  }, err => {
+    console.error('Erreur DB listener', err);
+    // If permission denied, show a clear message
+    if (err && err.code === 'PERMISSION_DENIED') {
+      alert('Erreur: accès à la base de données refusé. Vérifie les règles Realtime Database.');
+    }
+  });
 });
 
 /* ---------- Render ---------- */
@@ -211,7 +252,7 @@ function render(){
         const parsed = parseSigned(val);
         if(parsed === null){ alert('Format invalide. Exemple: +10 ou -5'); return; }
         const newScore = Math.max(0, (p.score || 0) + parsed);
-        try { await db.ref('players/' + p.id + '/score').set(newScore); } catch(err){ console.error(err); alert('Erreur écriture'); }
+        try { await window.db.ref('players/' + p.id + '/score').set(newScore); } catch(err){ console.error(err); alert('Erreur écriture'); }
       };
 
       const editBtn = document.createElement('button');
@@ -221,7 +262,7 @@ function render(){
       editBtn.onclick = async ()=> {
         const newN = prompt('Nouveau nom pour '+p.name, p.name);
         if(newN && newN.trim()){
-          try { await db.ref('players/' + p.id + '/name').set(newN.trim()); } catch(err){ console.error(err); alert('Erreur écriture'); }
+          try { await window.db.ref('players/' + p.id + '/name').set(newN.trim()); } catch(err){ console.error(err); alert('Erreur écriture'); }
         }
       };
 
@@ -230,7 +271,7 @@ function render(){
       delBtn.textContent = 'Supprimer';
       delBtn.onclick = async ()=> {
         if(confirm('Supprimer '+p.name+' du classement ?')){
-          try { await db.ref('players/' + p.id).remove(); } catch(err){ console.error(err); alert('Erreur suppression'); }
+          try { await window.db.ref('players/' + p.id).remove(); } catch(err){ console.error(err); alert('Erreur suppression'); }
         }
       };
 
@@ -284,13 +325,13 @@ confirmAdd.addEventListener('click', async ()=> {
   if(!name){ alert('Nom requis'); return; }
   const id = genId();
   const p = { name: name, score: Math.max(0, Math.floor(score)), createdAt: Date.now() };
-  try { await db.ref('players/' + id).set(p); newName.value = ''; newScore.value = '0'; } catch(err){ console.error(err); alert('Impossible d\\'ajouter le joueur. Vérifie les règles DB.'); }
+  try { await window.db.ref('players/' + id).set(p); newName.value = ''; newScore.value = '0'; } catch(err){ console.error(err); alert("Impossible d'ajouter le joueur. Vérifie les règles DB."); }
 });
 
 btnReset.addEventListener('click', async ()=> {
   if(!isAdmin){ alert('Accès admin requis'); return; }
   if(confirm('Réinitialiser tout le leaderboard ? (action irréversible)')){
-    try { await db.ref('players').remove(); } catch(err){ console.error(err); alert('Impossible de réinitialiser.'); }
+    try { await window.db.ref('players').remove(); } catch(err){ console.error(err); alert('Impossible de réinitialiser.'); }
   }
 });
 
