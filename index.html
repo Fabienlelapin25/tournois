@@ -7,14 +7,13 @@
 <style>
   :root{
     --bg:#0b0f14;
-    --panel:#0f1720;
     --accent:#3dd1ff;
     --accent-2:#6ad1ff;
     --muted:#9aa6b2;
     --glow: 0 6px 24px rgba(61,209,255,0.08);
     --card-glow: 0 8px 30px rgba(58,150,255,0.08);
   }
-  html,body{height:100%;margin:0;background:radial-gradient(1200px 600px at 10% 10%, rgba(61,209,255,0.03), transparent 6%),linear-gradient(180deg,#071018 0%, #071018 40%, #05060a 100%);color:#e6f3fb;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;}
+  html,body{height:100%;margin:0;background:radial-gradient(1200px 600px at 10% 10%, rgba(61,209,255,0.03), transparent 6%),linear-gradient(180deg,#071018 0%, #071018 40%, #05060a 100%);color:#e6f3fb;font-family:Inter,system-ui,Roboto,Arial;}
   .wrap{display:grid;grid-template-columns:220px 1fr 220px;gap:20px;padding:22px;align-items:start;min-height:100vh;box-sizing:border-box;}
   .side{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.03);padding:14px;border-radius:12px;box-shadow:var(--glow);height:fit-content;min-height:120px;}
   .center{background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));border:1px solid rgba(255,255,255,0.04);padding:18px;border-radius:14px;box-shadow:var(--card-glow);}
@@ -26,7 +25,6 @@
   .board-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
   .board-title{display:flex;gap:12px;align-items:center;}
   .board-title h2{margin:0;font-size:18px;color:var(--accent-2);}
-  .board-controls{display:flex;gap:8px;align-items:center;}
   table{width:100%;border-collapse:collapse;font-size:14px;}
   thead th{font-weight:600;text-align:left;padding:10px 8px;color:var(--muted);font-size:12px;border-bottom:1px solid rgba(255,255,255,0.03);}
   tbody tr{transition:transform .12s ease, background .12s ease;}
@@ -124,10 +122,8 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-/* ADMIN PASSWORD (exposé volontairement pour debug) */
-window.ADMIN_PASSWORD = 'admin123'; // modifie ici si besoin
-
-/* variables accessibles depuis la console pour debug */
+/* ADMIN PASSWORD (visible dans le code) */
+const ADMIN_PASSWORD = 'admin123';
 var isAdmin = false;
 const MAX_PLAYERS = 100;
 
@@ -160,17 +156,9 @@ let players = [];
 
 /* DB listener */
 playersRef.on('value', snapshot => {
-  try {
-    const data = snapshot.val() || {};
-    players = Object.keys(data).map(k => ({ id: k, ...data[k] }));
-    render();
-  } catch(err) {
-    console.error('Erreur lecture DB:', err);
-    adminInfo.textContent = 'Erreur lecture DB (voir console)';
-  }
-}, error => {
-  console.error('Listener DB error:', error);
-  adminInfo.textContent = 'Erreur DB: ' + (error && error.message ? error.message : 'permission?');
+  const data = snapshot.val() || {};
+  players = Object.keys(data).map(k => ({ id: k, ...data[k] }));
+  render();
 });
 
 /* render */
@@ -225,12 +213,7 @@ function render(){
         const parsed = parseSigned(val);
         if(parsed === null){ alert('Format invalide. Exemple: +10 ou -5'); return; }
         const newScore = Math.max(0, (p.score || 0) + parsed);
-        try {
-          await db.ref('players/' + p.id + '/score').set(newScore);
-        } catch(err) {
-          console.error('Erreur écriture score:', err);
-          alert('Erreur lors de la mise à jour du score. Vérifie les règles DB et la console.');
-        }
+        try { await db.ref('players/' + p.id + '/score').set(newScore); } catch(err){ console.error(err); alert('Erreur écriture'); }
       };
 
       const editBtn = document.createElement('button');
@@ -239,12 +222,7 @@ function render(){
       editBtn.onclick = async ()=> {
         const newN = prompt('Nouveau nom pour '+p.name, p.name);
         if(newN && newN.trim()){
-          try {
-            await db.ref('players/' + p.id + '/name').set(newN.trim());
-          } catch(err) {
-            console.error('Erreur écriture nom:', err);
-            alert('Erreur lors de la modification du nom. Vérifie les règles DB et la console.');
-          }
+          try { await db.ref('players/' + p.id + '/name').set(newN.trim()); } catch(err){ console.error(err); alert('Erreur écriture'); }
         }
       };
 
@@ -253,12 +231,7 @@ function render(){
       delBtn.textContent = 'Supprimer';
       delBtn.onclick = async ()=> {
         if(confirm('Supprimer '+p.name+' du classement ?')){
-          try {
-            await db.ref('players/' + p.id).remove();
-          } catch(err) {
-            console.error('Erreur suppression:', err);
-            alert('Erreur lors de la suppression. Vérifie les règles DB et la console.');
-          }
+          try { await db.ref('players/' + p.id).remove(); } catch(err){ console.error(err); alert('Erreur suppression'); }
         }
       };
 
@@ -281,41 +254,21 @@ function render(){
 }
 
 /* login */
-async function doLoginAttempt(inputValue){
-  try {
-    const val = (inputValue || '').toString().trim();
-    console.log('Tentative login (val fournie ?):', val ? '[fourni]' : '[vide]');
-    if(val === window.ADMIN_PASSWORD){
-      isAdmin = true;
-      adminInfo.textContent = "Connecté en tant qu'admin";
-      btnLogin.style.display = 'none';
-      btnLogout.style.display = 'inline-block';
-      adminAddForm.style.display = 'block';
-      btnAddPlayer.style.display = 'inline-block';
-      btnReset.style.display = 'inline-block';
-      if(adminPw) adminPw.value = '';
-      render();
-      console.log('Login admin OK');
-      return true;
-    } else {
-      console.log('Mot de passe incorrect');
-      return false;
-    }
-  } catch(err) {
-    console.error('Erreur login:', err);
-    return false;
-  }
-}
-
-btnLogin.addEventListener('click', async ()=> {
-  let val = '';
-  if(adminPw && !adminPw.disabled){
-    val = adminPw.value || '';
+btnLogin.addEventListener('click', ()=> {
+  const val = (adminPw.value || '').toString().trim();
+  if(val === ADMIN_PASSWORD){
+    isAdmin = true;
+    adminInfo.textContent = "Connecté en tant qu'admin";
+    btnLogin.style.display = 'none';
+    btnLogout.style.display = 'inline-block';
+    adminAddForm.style.display = 'block';
+    btnAddPlayer.style.display = 'inline-block';
+    btnReset.style.display = 'inline-block';
+    adminPw.value = '';
+    render();
   } else {
-    val = prompt('Mot de passe admin :') || '';
+    alert('Mot de passe incorrect');
   }
-  const ok = await doLoginAttempt(val);
-  if(!ok) alert('Mot de passe incorrect');
 });
 
 /* logout */
@@ -331,9 +284,7 @@ btnLogout.addEventListener('click', ()=> {
 });
 
 /* add player */
-btnAddPlayer.addEventListener('click', ()=> {
-  adminAddForm.style.display = adminAddForm.style.display === 'none' ? 'block' : 'none';
-});
+btnAddPlayer.addEventListener('click', ()=> { adminAddForm.style.display = adminAddForm.style.display === 'none' ? 'block' : 'none'; });
 
 confirmAdd.addEventListener('click', async ()=> {
   if(!isAdmin){ alert('Accès admin requis'); return; }
@@ -343,25 +294,14 @@ confirmAdd.addEventListener('click', async ()=> {
   if(players.length >= MAX_PLAYERS){ alert('Nombre maximum de joueurs atteint ('+MAX_PLAYERS+')'); return; }
   const id = genId();
   const p = { name: name, score: Math.max(0, Math.floor(score)), createdAt: Date.now() };
-  try {
-    await db.ref('players/' + id).set(p);
-    newName.value = ''; newScore.value = '0';
-  } catch(err) {
-    console.error('Erreur ajout joueur:', err);
-    alert('Impossible d\'ajouter le joueur. Vérifie les règles DB et la console pour "permission_denied".');
-  }
+  try { await db.ref('players/' + id).set(p); newName.value = ''; newScore.value = '0'; } catch(err){ console.error(err); alert('Impossible d\\'ajouter le joueur. Vérifie les règles DB.'); }
 });
 
 /* reset */
 btnReset.addEventListener('click', async ()=> {
   if(!isAdmin){ alert('Accès admin requis'); return; }
   if(confirm('Réinitialiser tout le leaderboard ? (action irréversible)')){
-    try {
-      await db.ref('players').remove();
-    } catch(err) {
-      console.error('Erreur reset:', err);
-      alert('Impossible de réinitialiser. Vérifie les règles DB et la console.');
-    }
+    try { await db.ref('players').remove(); } catch(err){ console.error(err); alert('Impossible de réinitialiser.'); }
   }
 });
 
